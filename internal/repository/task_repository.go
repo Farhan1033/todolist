@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"time"
 	"to-do-list/database"
 	"to-do-list/model"
 
@@ -40,14 +41,14 @@ func (r *taskRepo) GetTask() ([]model.Task, error) {
 }
 
 func (r *taskRepo) GetTaskByUserId(userId uuid.UUID) ([]model.Task, error) {
-	var task []model.Task
-	err := database.DB.Where("user_id = ?", userId).Find(&task).Error
+	var tasks []model.Task
+	err := database.DB.Where("user_id = ?", userId).Find(&tasks).Error
 
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
 
-	return task, nil
+	return tasks, nil
 }
 
 func (r *taskRepo) GetTaskById(id int) (*model.Task, error) {
@@ -62,21 +63,26 @@ func (r *taskRepo) GetTaskById(id int) (*model.Task, error) {
 }
 
 func (r *taskRepo) UpdateTask(id int, input *model.Task) error {
-	var task model.Task
-	err := database.DB.First(&task, "id = ?", id).Error
-
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
+	updates := map[string]interface{}{
+		"title":        input.Title,
+		"description":  input.Description,
+		"is_completed": input.IsCompleted,
+		"updated_at":   time.Now(),
 	}
 
-	task.ID = input.ID
-	task.Title = input.Title
-	task.Description = input.Description
-	task.IsCompleted = input.IsCompleted
-	task.CreatedAt = input.CreatedAt
-	task.UpdatedAt = input.UpdatedAt
+	result := database.DB.Model(&model.Task{}).
+		Where("id = ? AND user_id = ?", id, input.UserID).
+		Updates(updates)
 
-	return database.DB.Save(&task).Error
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("task tidak dapat ditemukan atau Anda tidak memiliki akses")
+	}
+
+	return nil
 }
 
 func (r *taskRepo) DeleteTask(id int) error {

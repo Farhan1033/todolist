@@ -13,6 +13,6 @@ type Task struct {
 	IsCompleted bool      `json:"is_completed" gorm:"default:false"`
 	UserID      uuid.UUID `gorm:"type:uuid" json:"user_id"`
 	User        User      `gorm:"foreignKey:UserID" json:"-" binding:"-"`
-	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime; autoUpdateTime"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoCreateTime; autoUpdateTime"`
 }

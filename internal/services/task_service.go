@@ -12,9 +12,9 @@ import (
 type TaskService interface {
 	CreateTask(*gin.Context, *model.Task) error
 	GetTask() ([]model.Task, error)
-	GetTaskByUserId(userId uuid.UUID) ([]model.Task, error)
+	GetTaskByUserId(c *gin.Context) ([]model.Task, error)
 	GetTaskById(id int) (*model.Task, error)
-	UpdateTask(id int, input *model.Task) error
+	UpdateTask(id int, input *model.Task, c *gin.Context) error
 	DeleteTask(id int) error
 }
 
@@ -67,18 +67,31 @@ func (s *taskSvc) GetTask() ([]model.Task, error) {
 	return datas, err
 }
 
-func (s *taskSvc) GetTaskByUserId(userId uuid.UUID) ([]model.Task, error) {
-	tasks, err := s.repo.GetTaskByUserId(userId)
+func (s *taskSvc) GetTaskByUserId(c *gin.Context) ([]model.Task, error) {
+	userId, ok := c.Value("user_id").(uuid.UUID)
+	if !ok {
+		userIdStr, exists := c.Value("user_id").(string)
+		if !exists {
+			return nil, errors.New("user tidak ditemukan")
+		}
 
+		parsedId, err := uuid.Parse(userIdStr)
+		if err != nil {
+			return nil, errors.New("token tidak valid")
+		}
+		userId = parsedId
+	}
+
+	tasks, err := s.repo.GetTaskByUserId(userId)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("gagal mengambil data task")
 	}
 
 	if len(tasks) == 0 {
 		return nil, errors.New("task not found")
 	}
 
-	return tasks, err
+	return tasks, nil
 }
 
 func (s *taskSvc) GetTaskById(id int) (*model.Task, error) {
@@ -94,10 +107,26 @@ func (s *taskSvc) GetTaskById(id int) (*model.Task, error) {
 	return tasks, err
 }
 
-func (s *taskSvc) UpdateTask(id int, input *model.Task) error {
-	if input.Title == "" || input.Description == "" || input.ID == 0 || input.CreatedAt.IsZero() || input.UpdatedAt.IsZero() {
+func (s *taskSvc) UpdateTask(id int, input *model.Task, c *gin.Context) error {
+	if input.Title == "" || input.Description == "" {
 		return errors.New("fields cannot be empty")
 	}
+
+	userId, ok := c.Value("user_id").(uuid.UUID)
+	if !ok {
+		userIdStr, exists := c.Value("user_id").(string)
+		if !exists {
+			return errors.New("user tidak ditemukan")
+		}
+
+		parsedId, err := uuid.Parse(userIdStr)
+		if err != nil {
+			return errors.New("token tidak valid")
+		}
+		userId = parsedId
+	}
+
+	input.UserID = userId
 
 	return s.repo.UpdateTask(id, input)
 }
